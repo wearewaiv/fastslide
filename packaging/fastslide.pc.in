@@ -1,0 +1,9 @@
+prefix=/usr
+libdir=${prefix}/lib/fastslide
+includedir=${prefix}/include
+
+Name: fastslide
+Description: FastSlide whole-slide image reader - C API.
+Version: @VERSION@
+Libs: -L${libdir} -lfastslide
+Cflags: -I${includedir}
