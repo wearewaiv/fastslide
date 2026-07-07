@@ -1,0 +1,87 @@
+name: Build & Publish Deb Packages
+
+on:
+  release:
+    types: [published]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.distro }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: debian-trixie
+            base_image: debian:trixie-slim
+            arch: amd64
+            runner: ubuntu-latest
+          - distro: debian-trixie
+            base_image: debian:trixie-slim
+            arch: arm64
+            runner: ubuntu-24.04-arm
+          - distro: ubuntu-26.04
+            base_image: ubuntu:26.04
+            arch: amd64
+            runner: ubuntu-latest
+          - distro: ubuntu-26.04
+            base_image: ubuntu:26.04
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build .deb
+        run: |
+          mkdir -p dist
+          docker buildx build \
+            --platform linux/${{ matrix.arch }} \
+            --build-arg BASE_IMAGE=${{ matrix.base_image }} \
+            --build-arg DISTRO_LABEL=${{ matrix.distro }} \
+            --target export \
+            --output type=local,dest=dist \
+            -f packaging/deb.Dockerfile .
+
+      - name: Test package installs cleanly with apt
+        run: |
+          docker buildx build \
+            --platform linux/${{ matrix.arch }} \
+            --build-arg BASE_IMAGE=${{ matrix.base_image }} \
+            --build-arg DISTRO_LABEL=${{ matrix.distro }} \
+            --target smoke-test \
+            -f packaging/deb.Dockerfile .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.distro }}-${{ matrix.arch }}
+          path: dist/*.deb
+
+  publish:
+    if: github.event_name == 'release'
+    name: Attach to release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Upload assets to release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" dist/*.deb \
+            --repo "${{ github.repository }}" --clobber
