@@ -1,0 +1,21 @@
+Package: fastslide-capi
+Version: @VERSION@-1
+Section: libs
+Priority: optional
+Architecture: @ARCH@
+Maintainer: WAIV CI <ci@wearewaiv.com>
+Description: FastSlide C API shared library (runtime)
+ FastSlide whole-slide image reader - C API (libfastslide_c.so), installed
+ into an architecture-agnostic /usr/lib/fastslide directory.
+Depends: libc6 (>= 2.34), @JPEG_RUNTIME@ (>= 2.1.0), libopenjp2-7 (>= 2.4.0), libzstd1 (>= 1.4.8), zlib1g (>= 1:1.2.11)
+
+Package: fastslide-capi-dev
+Version: @VERSION@-1
+Section: libdevel
+Priority: optional
+Architecture: @ARCH@
+Maintainer: WAIV CI <ci@wearewaiv.com>
+Description: FastSlide C API shared library (development files)
+ Headers and pkg-config file for building against the FastSlide C API
+ (libfastslide_c.so).
+Depends: fastslide-capi (= @VERSION@-1)
