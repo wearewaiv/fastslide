@@ -57,7 +57,26 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 WORKDIR /usr/local/src/fastslide
 COPY . .
 
-RUN meson setup builddir \
+# Per-architecture CPU baseline. The default x86-64 target has no SSSE3/AVX2,
+# so the SIMD paths of the iSyntax decoder (YCoCg conversion, AVX2 wavelet
+# transform) were compiled out; x86-64-v3 (AVX2, Haswell+) turns them on and
+# lets the compiler vectorise the rest. On arm64, armv8.2-a+fp16+dotprod is
+# the common subset of AWS Graviton2/3/4 and Apple M-series (Docker
+# linux/arm64 on macOS); it drops Graviton1 (armv8.0). Pass an empty value
+# to build for the generic baseline.
+ARG AMD64_MARCH=x86-64-v3
+ARG ARM64_MARCH=armv8.2-a+fp16+dotprod
+
+# meson stores CFLAGS/CXXFLAGS at setup time, so they only need to be set here.
+RUN case "$TARGETARCH" in \
+      amd64) MARCH="$AMD64_MARCH" ;; \
+      arm64) MARCH="$ARM64_MARCH" ;; \
+      *) MARCH="" ;; \
+    esac && \
+    MARCH_FLAG="${MARCH:+-march=$MARCH}" && \
+    echo "TARGETARCH=$TARGETARCH march flag: ${MARCH_FLAG:-<none>}" && \
+    CFLAGS="$CFLAGS $MARCH_FLAG" CXXFLAGS="$CXXFLAGS $MARCH_FLAG" \
+    meson setup builddir \
       -Db_lto=true -Dbuild_tests=false -Dbuild_tool=false \
       -Dbuild_python=false -Dbuild_c_api=true -Dshared_c_api=true \
       -Dsimpletiff:default_library=static
